@@ -19,6 +19,8 @@ Plots the analysis obtained in causal impact algorithm.
 
 from __future__ import absolute_import, division, print_function
 
+import pandas as pd
+
 
 class Plot(object):
     """Takes all the vectors and final analysis performed in the post-period inference
@@ -52,22 +54,25 @@ class Plot(object):
                     )
                 )
 
-        # We throw away the first point as there's no analysis to be performed on this
-        # value.
-        inferences = self.inferences.iloc[1:, :]
+        # First points can be noisy due approximation techniques used in the likelihood
+        # optimizaion process. We remove those points from the plots.
+        llb = self.trained_model.filter_results.loglikelihood_burn
+        inferences = self.inferences.iloc[llb:]
+
         intervention_idx = inferences.index.get_loc(self.post_period[0])
         n_panels = len(panels)
         ax = plt.subplot(n_panels, 1, 1)
         idx = 1
 
         if 'original' in panels:
-            ax.plot(self.data.iloc[:, 0], 'k', label='y')
+            ax.plot(pd.concat([self.pre_data.iloc[llb:, 0], self.post_data.iloc[:, 0]]),
+                    'k', label='y')
             ax.plot(inferences['preds'], 'b--', label='Predicted')
             ax.axvline(inferences.index[intervention_idx - 1], c='k', linestyle='--')
             ax.fill_between(
-                inferences['preds'].index,
-                inferences['preds_lower'],
-                inferences['preds_upper'],
+                self.pre_data.index[llb:].union(self.post_data.index),
+                inferences['preds_lower'][~inferences['preds_lower'].isna()],
+                inferences['preds_upper'][~inferences['preds_upper'].isna()],
                 facecolor='blue',
                 interpolate=True,
                 alpha=0.25
@@ -99,7 +104,8 @@ class Plot(object):
 
         if 'cumulative' in panels:
             ax = plt.subplot(n_panels, 1, idx, sharex=ax)
-            ax.plot(inferences['post_cum_effects'], 'b--', label='Cumulative Effect')
+            ax.plot(inferences['post_cum_effects'], 'b--',
+                    label='Cumulative Effect')
             ax.axvline(inferences.index[intervention_idx - 1], c='k', linestyle='--')
             ax.fill_between(
                 inferences['post_cum_effects'].index,

@@ -44,11 +44,13 @@ def test_plot_original_panel(rand_data, pre_int_period, post_int_period, monkeyp
     plotter_mock.subplot.assert_any_call(1, 1, 1)
     ax_args = ax_mock.plot.call_args_list
 
-    assert_array_equal(ci.data.iloc[:, 0], ax_args[0][0][0])
+    llb = ci.trained_model.filter_results.loglikelihood_burn
+
+    assert_array_equal(ci.pre_data.iloc[llb:, 0], ax_args[0][0][0])
     assert ax_args[0][0][1] == 'k'
     assert ax_args[0][1] == {'label': 'y'}
 
-    inferences = ci.inferences.iloc[1:, :]
+    inferences = ci.inferences.iloc[llb:, :]
 
     assert_array_equal(inferences['preds'], ax_args[1][0][0])
     assert ax_args[1][0][1] == 'b--'
@@ -66,6 +68,48 @@ def test_plot_original_panel(rand_data, pre_int_period, post_int_period, monkeyp
     ax_mock.legend.assert_called()
 
     plotter_mock.show.assert_called_once()
+
+def test_plot_original_panel_gaped_data(rand_data, pre_int_gap_period,
+                                        post_int_gap_period, monkeypatch):
+    ci = CausalImpact(rand_data, pre_int_gap_period, post_int_gap_period)
+    ax_mock = mock.Mock()
+    plotter_mock = mock.Mock()
+    plotter_mock.subplot.return_value = ax_mock
+    plot_mock = mock.Mock(return_value=plotter_mock)
+    monkeypatch.setattr(plot.Plot, '_get_plotter', plot_mock)
+
+    ci.plot(panels=['original'])
+    plot_mock.assert_called_once()
+    plotter_mock.figure.assert_called_with(figsize=(15, 12))
+    plotter_mock.subplot.assert_any_call(1, 1, 1)
+    ax_args = ax_mock.plot.call_args_list
+
+    llb = ci.trained_model.filter_results.loglikelihood_burn
+
+    assert_array_equal(ci.pre_data.iloc[llb:, 0], ax_args[0][0][0])
+    assert ax_args[0][0][1] == 'k'
+    assert ax_args[0][1] == {'label': 'y'}
+
+    inferences = ci.inferences.iloc[llb:, :]
+
+    assert_array_equal(inferences['preds'], ax_args[1][0][0])
+    assert ax_args[1][0][1] == 'b--'
+    assert ax_args[1][1] == {'label': 'Predicted'}
+
+    ax_mock.axvline.assert_called_with(ci.post_period[0] - 1, c='k', linestyle='--')
+
+    ax_args = ax_mock.fill_between.call_args_list[0]
+    assert_array_equal(ax_args[0][0], inferences['preds'].index)
+    assert_array_equal(ax_args[0][1], inferences['preds_lower'])
+    assert_array_equal(ax_args[0][2], inferences['preds_upper'])
+    assert ax_args[1] == {'facecolor': 'blue', 'interpolate': True, 'alpha': 0.25}
+
+    ax_mock.grid.assert_called_with(True, linestyle='--')
+    ax_mock.legend.assert_called()
+
+    plotter_mock.show.assert_called_once()
+
+
 
 
 def test_plot_original_panel_date_index(date_rand_data, pre_str_period, post_str_period,
