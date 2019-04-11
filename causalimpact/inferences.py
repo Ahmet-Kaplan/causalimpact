@@ -197,23 +197,23 @@ class Inferences(object):
         # We do exactly as in statsmodels for past predictions:
         # https://github.com/statsmodels/statsmodels/blob/v0.9.0/statsmodels/tsa/statespace/structural.py
         predict = self.trained_model.filter_results.forecasts[0]
-        print('predict: ', predict)
+        #print('predict: ', predict)
         std_errors = np.sqrt(self.trained_model.filter_results.forecasts_error_cov[0, 0])
-        print('std errors: ', std_errors)
+        #print('std errors: ', std_errors)
 
         critical_value = get_z_score(1 - self.alpha / 2.)
-        print('critical value: ', critical_value)
+        #print('critical value: ', critical_value)
 
         pre_preds_lower = pd.Series(
             self._unstardardize(predict - critical_value * std_errors),
             index=self.pre_data.index
         )
-        print('pre preds_lower: ', pre_preds_lower)
+        #print('pre preds_lower: ', pre_preds_lower)
         pre_preds_upper = pd.Series(
             self._unstardardize(predict + critical_value * std_errors),
             index=self.pre_data.index
         )
-        print('pre preds upper: ', pre_preds_upper)
+        #print('pre preds upper: ', pre_preds_upper)
 
         post_predictor = self.trained_model.get_forecast(
             steps=len(self.post_data),
@@ -225,17 +225,14 @@ class Inferences(object):
             self._unstardardize(predict),
             index=self.pre_data.index
         )
-        post_preds = pd.Series(
-            self._unstardardize(post_predictor.predicted_mean),
-            index=self.post_data.index
-        )
+        post_preds = self._unstardardize(post_predictor.predicted_mean)
 
         # Sets index properly.
         #print('pre preds index: ', pre_preds.index)
-        print('self pre data index: ', self.pre_data.index)
+        #print('self pre data index: ', self.pre_data.index)
         #print('self llb: ', self.trained_model.filter_results.loglikelihood_burn)
         #pre_preds.index = self.pre_data.index
-        #post_preds.index = self.post_data.index
+        post_preds.index = self.post_data.index
 
         # Confidence Intervals.
         #pre_ci = self._unstardardize(pre_predictor.conf_int(alpha=self.alpha))
@@ -246,8 +243,8 @@ class Inferences(object):
         post_preds_upper = post_ci.iloc[:, 1]
 
         # Sets index properly.
-        pre_preds_lower.index = self.pre_data.index
-        pre_preds_upper.index = self.pre_data.index
+        #pre_preds_lower.index = self.pre_data.index
+        #pre_preds_upper.index = self.pre_data.index
         post_preds_lower.index = self.post_data.index
         post_preds_upper.index = self.post_data.index
 
@@ -279,10 +276,14 @@ class Inferences(object):
             index=self.get_cum_index()
         )
 
+        # Using a net value of data to accomodate cases where there's gaps between
+        # pre and post intervention periods.
+        net_data = pd.concat([self.pre_data, self.post_data])
+
         # Effects analysis.
-        point_effects = self.data.iloc[:, 0] - preds
-        point_effects_lower = self.data.iloc[:, 0] - preds_upper
-        point_effects_upper = self.data.iloc[:, 0] - preds_lower
+        point_effects = net_data.iloc[:, 0] - preds
+        point_effects_lower = net_data.iloc[:, 0] - preds_upper
+        point_effects_upper = net_data.iloc[:, 0] - preds_lower
         post_point_effects = self.post_data.iloc[:, 0] - post_preds
 
         # Cumulative Effects analysis.

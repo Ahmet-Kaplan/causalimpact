@@ -41,7 +41,7 @@ class Plot(object):
           RuntimeError: if inferences were not computed yet.
         """
         plt = self._get_plotter()
-        plt.figure(figsize=figsize)
+        fig = plt.figure(figsize=figsize)
         if self.summary_data is None:
             raise RuntimeError('Please first run inferences before plotting results')
 
@@ -71,8 +71,8 @@ class Plot(object):
             ax.axvline(inferences.index[intervention_idx - 1], c='k', linestyle='--')
             ax.fill_between(
                 self.pre_data.index[llb:].union(self.post_data.index),
-                inferences['preds_lower'][~inferences['preds_lower'].isna()],
-                inferences['preds_upper'][~inferences['preds_upper'].isna()],
+                inferences['preds_lower'],
+                inferences['preds_upper'],
                 facecolor='blue',
                 interpolate=True,
                 alpha=0.25
@@ -118,6 +118,13 @@ class Plot(object):
             ax.grid(True, linestyle='--')
             ax.axhline(y=0, color='k', linestyle='--')
             ax.legend()
+
+        # Alert if points were removed due to loglikelihood burning data
+        if llb > 0:
+            text = ('Note: The first {} observations were removed due to approximate '
+                    'diffuse initialization.'.format(llb))
+            fig.text(0.1, 0.01, text, fontsize='large')
+
         plt.show()
 
     def _get_plotter(self):  # pragma: no cover
