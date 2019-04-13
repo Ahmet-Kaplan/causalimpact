@@ -22,8 +22,8 @@ from __future__ import absolute_import, division, print_function
 from datetime import datetime, timedelta
 
 import mock
-import pytest
 import pandas as pd
+import pytest
 from numpy.testing import assert_array_equal
 from pandas import Timestamp
 
@@ -80,8 +80,9 @@ def test_plot_original_panel(rand_data, pre_int_period, post_int_period, monkeyp
         fontsize='large'
     )
 
+
 def test_plot_original_panel_gap_data(rand_data, pre_int_gap_period,
-                                        post_int_gap_period, monkeypatch):
+                                      post_int_gap_period, monkeypatch):
     ci = CausalImpact(rand_data, pre_int_gap_period, post_int_gap_period)
     ax_mock = mock.Mock()
     plotter_mock = mock.Mock()
@@ -786,6 +787,8 @@ def test_plot_multi_panels(rand_data, pre_int_period, post_int_period, monkeypat
     plotter_mock = mock.Mock()
     plotter_mock.subplot.return_value = ax_mock
     plot_mock = mock.Mock(return_value=plotter_mock)
+    fig_mock = mock.Mock()
+    plotter_mock.figure.return_value = fig_mock
     monkeypatch.setattr(plot.Plot, '_get_plotter', plot_mock)
 
     ci.plot(panels=['original', 'pointwise'], figsize=(10, 10))
@@ -836,6 +839,13 @@ def test_plot_multi_panels(rand_data, pre_int_period, post_int_period, monkeypat
     plotter_mock.setp.assert_called_with('xticklabels', visible=False)
     assert ax_mock.plot.call_count == 4
     plotter_mock.show.assert_called_once()
+    fig_mock.text.assert_called_once_with(
+        0.1,
+        0.01,
+        ('Note: The first 1 observations were removed due to approximate diffuse '
+         'initialization.'),
+        fontsize='large'
+    )
 
 
 def test_plot_raises_when_not_initialized(rand_data, pre_int_period, post_int_period,
@@ -861,3 +871,18 @@ def test_plot_raises_wrong_input_panel(rand_data, pre_int_period, post_int_perio
         '"test" is not a valid panel. Valid panels are: '
         '"original", "pointwise", "cumulative".'
     )
+
+
+def test_plot_with_no_llb(rand_data, pre_int_period, post_int_period, monkeypatch):
+    ax_mock = mock.Mock()
+    plotter_mock = mock.Mock()
+    plotter_mock.subplot.return_value = ax_mock
+    plot_mock = mock.Mock(return_value=plotter_mock)
+    fig_mock = mock.Mock()
+    plotter_mock.figure.return_value = fig_mock
+    monkeypatch.setattr(plot.Plot, '_get_plotter', plot_mock)
+
+    ci = CausalImpact(rand_data, pre_int_period, post_int_period)
+    ci.trained_model.filter_results.loglikelihood_burn = 0
+    ci.plot()
+    fig_mock.text.assert_not_called()
